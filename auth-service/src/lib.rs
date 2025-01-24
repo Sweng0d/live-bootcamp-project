@@ -7,7 +7,10 @@ use axum::{
 };
 use tower_http::services::ServeDir; // Para o ServeDir
 use std::error::Error;              // Para o Box<dyn Error>
+use crate::routes::{signup, login, logout, verify_2fa, verify_token};
 
+
+pub mod routes;
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -43,24 +46,4 @@ impl Application {
         self.server.await
     }
 
-}
-
-pub async fn signup() -> impl IntoResponse {
-    StatusCode::OK.into_response()
-}
-
-pub async fn login() -> impl IntoResponse {
-    StatusCode::OK.into_response()
-}
-
-pub async fn logout() -> impl IntoResponse {
-    StatusCode::OK.into_response()
-}
-
-pub async fn verify_2fa() -> impl IntoResponse {
-    StatusCode::OK.into_response()
-}
-
-pub async fn verify_token() -> impl IntoResponse {
-    StatusCode::OK.into_response()
 }
