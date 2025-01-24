@@ -1,6 +1,9 @@
 use axum::{
     Router,          // Para o Router
     serve::Serve,    // Para o Serve (caso esteja usando axum::serve)
+    http::StatusCode,
+    routing::post,
+    response::IntoResponse
 };
 use tower_http::services::ServeDir; // Para o ServeDir
 use std::error::Error;              // Para o Box<dyn Error>
@@ -20,7 +23,12 @@ impl Application {
         // Also, remove the `hello` route.
         // We don't need it at this point!
         let router = Router::new()
-        .nest_service("/", ServeDir::new("assets"));
+        .nest_service("/", ServeDir::new("assets"))
+        .route("/signup", post(signup))
+        .route("/login", post(login))
+        .route("/logout", post(logout))
+        .route("/verify-2fa", post(verify_2fa))
+        .route("/verify-token", post(verify_token));
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
@@ -34,4 +42,25 @@ impl Application {
         println!("listening on {}", &self.address);
         self.server.await
     }
+
+}
+
+pub async fn signup() -> impl IntoResponse {
+    StatusCode::OK.into_response()
+}
+
+pub async fn login() -> impl IntoResponse {
+    StatusCode::OK.into_response()
+}
+
+pub async fn logout() -> impl IntoResponse {
+    StatusCode::OK.into_response()
+}
+
+pub async fn verify_2fa() -> impl IntoResponse {
+    StatusCode::OK.into_response()
+}
+
+pub async fn verify_token() -> impl IntoResponse {
+    StatusCode::OK.into_response()
 }
