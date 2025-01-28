@@ -8,36 +8,38 @@ use axum::{
 use tower_http::services::ServeDir; // Para o ServeDir
 use std::error::Error;              // Para o Box<dyn Error>
 use crate::routes::{signup, login, logout, verify_2fa, verify_token};
+use crate::services::hashmap_user_store::HashmapUserStore; 
+use crate::app_state::AppState;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 
 pub mod routes;
+pub mod domain;
+pub mod services;
+pub mod app_state;
 
-// This struct encapsulates our application-related logic.
 pub struct Application {
     server: Serve<Router, Router>,
-    // address is exposed as a public field
-    // so we have access to it in tests.
     pub address: String,
 }
 
 impl Application {
-    pub async fn build(address: &str) -> Result<Self, Box<dyn Error>> {
-        // Move the Router definition from `main.rs` to here.
-        // Also, remove the `hello` route.
-        // We don't need it at this point!
+    pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
+        
         let router = Router::new()
         .nest_service("/", ServeDir::new("assets"))
         .route("/signup", post(signup))
         .route("/login", post(login))
         .route("/logout", post(logout))
         .route("/verify-2fa", post(verify_2fa))
-        .route("/verify-token", post(verify_token));
+        .route("/verify-token", post(verify_token))
+        .with_state(app_state);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
         let server = axum::serve(listener, router);
 
-        // Create a new Application instance and return it
         Ok(Self {server, address})
     }
 
