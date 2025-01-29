@@ -3,7 +3,8 @@ use axum::{
     serve::Serve,    // Para o Serve (caso esteja usando axum::serve)
     http::StatusCode,
     routing::post,
-    response::IntoResponse
+    response::{IntoResponse, Response},
+    Json,
 };
 use tower_http::services::ServeDir; // Para o ServeDir
 use std::error::Error;              // Para o Box<dyn Error>
@@ -12,6 +13,9 @@ use crate::services::hashmap_user_store::HashmapUserStore;
 use crate::app_state::AppState;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use serde::{Serialize, Deserialize};
+use crate::domain::error::AuthAPIError;
+
 
 
 pub mod routes;
@@ -48,4 +52,25 @@ impl Application {
         self.server.await
     }
 
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+}
+
+impl IntoResponse for AuthAPIError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
+            AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
+            AuthAPIError::UnexpectedError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
+            }
+        };
+        let body = Json(ErrorResponse {
+            error: error_message.to_string(),
+        });
+        (status, body).into_response()
+    }
 }
