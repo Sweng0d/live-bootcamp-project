@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use async_trait::async_trait;
 
-use crate::domain::user;
-use crate::services::hashmap_user_store::user::User;
+use crate::domain::{user::User, email::Email, password::Password}; 
 use crate::domain::data_stores::{UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashmapUserStore {
-    pub users: HashMap<String, User>,
+    pub users: HashMap<Email, User>,
 }
 
 #[async_trait]
@@ -25,7 +24,7 @@ impl UserStore for HashmapUserStore {
         
     }
 
-    async fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
         let user_found = self.users.get(email);
 
         if let Some(u) = user_found {
@@ -35,12 +34,12 @@ impl UserStore for HashmapUserStore {
         }
     }
 
-    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError>{
+    async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError>{
         let user_found = self.users.get(email);
 
         match user_found {
             None => {Err(UserStoreError::UserNotFound)}
-            Some(u) => if u.password == password {
+            Some(u) => if u.password == *password {
                 Ok(())
             } else {
                 Err(UserStoreError::InvalidCredentials)
@@ -55,10 +54,12 @@ mod tests {
     use super::*;
     use crate::domain::user::User;
 
-    fn make_user(email: &str, password: &str) -> User {
+    fn make_user(email_str: &str, password_str: &str) -> User {
+        let email = Email::parse(email_str).unwrap();
+        let password = Password::parse(password_str).unwrap();
         User {
-            email: email.to_string(), //trocar para função de gerador aleatorio de email
-            password: password.to_string(),
+            email,
+            password,
             requires_2fa: false,
         }
     }
@@ -84,13 +85,28 @@ mod tests {
         let user = make_user("test@example.com", "secretpassword");
         store.add_user(user.clone()).await.expect("Failed to add the user");
 
-        let user_existed = store.get_user("test@example.com").await;
+        // Em vez de passar &str, convertendo para Email
+        let email_ok = Email::parse("test@example.com").unwrap();
+        let user_existed = store.get_user(&email_ok).await;
 
         assert!(user_existed.is_ok(), "We expected success to get the user");
-        assert_eq!(user_existed.unwrap().email, "test@example.com", "The email of the user is not corret");
 
-        let user_non_existed = store.get_user("emailnotexistedtodayandnever@nevercreated.com.br").await;
-        assert_eq!(user_non_existed, Err(UserStoreError::UserNotFound), "we expected this email emailnotexistedtodayandnever@nevercreated.com.br did not exist");
+        // Comparar a string interna do Email com "test@example.com"
+        // ou comparar `user_existed.unwrap().email` com user.email
+        assert_eq!(
+            user_existed.as_ref().unwrap().email.as_ref(),
+            "test@example.com",
+            "The email of the user is not correct"
+        );
+
+        // Agora testamos com um email inexistente
+        let email_none = Email::parse("emailnotexistedtodayandnever@nevercreated.com.br").unwrap();
+        let user_non_existed = store.get_user(&email_none).await;
+        assert_eq!(
+            user_non_existed,
+            Err(UserStoreError::UserNotFound),
+            "we expected this email emailnotexistedtodayandnever@nevercreated.com.br did not exist"
+        );
     }
 
     #[tokio::test]
@@ -100,13 +116,30 @@ mod tests {
         let user = make_user("test@example.com", "secretpassword");
         store.add_user(user.clone()).await.expect("Failed to add the user");
 
-        let validation = store.validate_user("test@example.com", "secretpassword").await;
+        // Caso de sucesso
+        let email_ok = Email::parse("test@example.com").unwrap();
+        let password_ok = Password::parse("secretpassword").unwrap();
+        let validation = store.validate_user(&email_ok, &password_ok).await;
         assert!(validation.is_ok(), "Validation was not approved");
 
-        let validation2 = store.validate_user("test@example.com", "wrongpassword").await;
-        assert_eq!(validation2, Err(UserStoreError::InvalidCredentials), "Expected wrong password");
+        // Senha errada => InvalidCredentials
+        let wrong_password = Password::parse("wrongpassword").unwrap();
+        let validation2 = store.validate_user(&email_ok, &wrong_password).await;
+        assert_eq!(
+            validation2,
+            Err(UserStoreError::InvalidCredentials),
+            "Expected wrong password"
+        );
 
-        let validation3 = store.validate_user("emailnotvalid@example.com", "anypassword").await;
-        assert_eq!(validation3, Err(UserStoreError::UserNotFound), "Expected user not found");
+        // Email inexistente => UserNotFound
+        let email_none = Email::parse("emailnotvalid@example.com").unwrap();
+        let pass_any = Password::parse("anypassword").unwrap();
+        let validation3 = store.validate_user(&email_none, &pass_any).await;
+        assert_eq!(
+            validation3,
+            Err(UserStoreError::UserNotFound),
+            "Expected user not found"
+        );
     }
+
 }

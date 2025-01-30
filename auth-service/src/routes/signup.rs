@@ -2,9 +2,23 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
-use crate::domain::user::User;
+use crate::domain::{user::User, email::Email, password::Password}; 
 use crate::domain::error::AuthAPIError;
 use crate::domain::data_stores::UserStoreError;
+
+#[derive(Deserialize)]
+pub struct SignupRequest {
+    pub email: String,
+    pub password: String,
+    #[serde(rename = "requires2FA")]
+    pub requires_2fa: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct SignupResponse {
+    pub message: String,
+}
+
 
 // Se `UserStore` for realmente assíncrono, você chamará `.await` nos métodos
 // *Se* seu store atual for assíncrono, lembre de `await` no get_user e add_user
@@ -12,19 +26,23 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = request.email;
-    let password = request.password;
 
-    // 1) Validação rápida
-    // Retorna 400 (InvalidCredentials) se email ou password forem inválidos
-    if email.is_empty() || !email.contains('@') || password.len() < 8 {
-        return Err(AuthAPIError::InvalidCredentials);
-    }
+    let email = match Email::parse(&request.email) {
+        Ok(mail) => mail,
+        Err(_msg) => {
+            return Err(AuthAPIError::InvalidCredentials);
+        }
+    };
 
-    // 2) Cria User
+    let password = match Password::parse(&request.password) {
+        Ok(pass) => pass,
+        Err(_msg) => {
+            return Err(AuthAPIError::InvalidCredentials);
+        }
+    };
+
     let user = User::new(email, password, request.requires_2fa);
 
-    // 3) Obtem lock de escrita no store
     let mut user_store = state.user_store.write().await;
 
     // 4) Verifica se já existe usuário com este email
@@ -57,17 +75,4 @@ pub async fn signup(
             Err(AuthAPIError::UnexpectedError)
         }
     }
-}
-
-#[derive(Deserialize)]
-pub struct SignupRequest {
-    pub email: String,
-    pub password: String,
-    #[serde(rename = "requires2FA")]
-    pub requires_2fa: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SignupResponse {
-    pub message: String,
 }

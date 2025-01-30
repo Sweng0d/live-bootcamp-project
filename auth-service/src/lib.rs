@@ -16,8 +16,6 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use crate::domain::error::AuthAPIError;
 
-
-
 pub mod routes;
 pub mod domain;
 pub mod services;
