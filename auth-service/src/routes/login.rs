@@ -10,6 +10,7 @@ use crate::domain::{
     email::Email,
     error::AuthAPIError,
     password::Password,
+    data_stores::UserStoreError,
 };
 
 #[derive(Deserialize)]
@@ -36,6 +37,22 @@ pub async fn login(State(state): State<AppState>, Json(request): Json<LoginReque
             return Err(AuthAPIError::InvalidCredentials);
         }
     };
+
+    let user_store = &state.user_store.read().await;
+
+    match user_store.validate_user(&email, &password).await {
+        Ok(_) => {
+            // Credenciais OK, pode prosseguir
+        },
+        Err(UserStoreError::InvalidCredentials) | Err(UserStoreError::UserNotFound) => {
+            // Falha de credenciais => retorna 401
+            return Err(AuthAPIError::IncorrectCredentials);
+        }
+        Err(_) => {
+            // Qualquer outro erro do store => UnexpectedError
+            return Err(AuthAPIError::UnexpectedError);
+        }
+    }
 
     Ok((StatusCode::OK, "Logged in successfully").into_response())
 }

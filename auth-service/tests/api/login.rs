@@ -48,3 +48,31 @@ async fn should_return_400_if_invalid_input() {
     );
 
 }
+
+#[tokio::test]
+async fn should_return_401_if_incorrect_credentials() {
+    // Call the log-in route with incorrect credentials and assert
+    // that a 401 HTTP status code is returned along with the appropriate error message.     
+    let app = TestApp::new().await;
+
+    let signup_data = serde_json::json!({
+        "email": "correct_user@example.com",
+        "password": "secret123"
+    });
+
+    app.post_signup(&signup_data).await;
+
+    let invalid_login = serde_json::json!({
+        "email": "correct_user@example.com",
+        "password": "wrongpassword"
+    });
+
+    let response = app.post_login(&invalid_login).await;
+
+    assert_eq!(
+        401,
+        response.status().as_u16(),
+        "Expected 401 Unauthorized for incorrect credentials."
+    );
+
+}
