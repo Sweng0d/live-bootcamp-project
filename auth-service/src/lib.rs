@@ -20,6 +20,7 @@ pub mod routes;
 pub mod domain;
 pub mod services;
 pub mod app_state;
+pub mod utils;
 
 pub struct Application {
     server: Serve<Router, Router>,
