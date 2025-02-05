@@ -1,14 +1,17 @@
-use auth_service::Application;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use auth_service::app_state::AppState;
-use auth_service::services::hashmap_user_store::HashmapUserStore;
+use auth_service::{
+    app_state::AppState, services::hashmap_user_store::HashmapUserStore, utils::constants::test,
+    Application,
+};
 use tokio::sync::RwLock;
 use std::sync::Arc;
+use reqwest::cookie::Jar;
 
 pub struct TestApp {
     pub address: String,
+    pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
 }
 
@@ -17,7 +20,7 @@ impl TestApp {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let app_state = AppState::new(user_store);
 
-        let app = Application::build(app_state, "127.0.0.1:0")
+        let app = Application::build(app_state, test::APP_ADDRESS)
             .await
             .expect("Failed to build app");
 
@@ -28,12 +31,17 @@ impl TestApp {
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
-        let http_client = reqwest::Client::new(); // Create a Reqwest http client instance
+        let cookie_jar = Arc::new(Jar::default());
+        let http_client = reqwest::Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
 
         // Create new `TestApp` instance and return it
         TestApp {
             address,
-            http_client
+            cookie_jar,
+            http_client,
         }
 
     }
@@ -86,10 +94,10 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn verify_token(&self, data: &TokenData) -> reqwest::Response {
+    pub async fn post_verify_token<Body>(&self, body: &Body) -> reqwest::Response where Body: serde::Serialize,{
         self.http_client
             .post(&format!("{}/verify-token", &self.address))
-            .json(data)
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
