@@ -32,7 +32,6 @@ impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
         let allowed_origins = [
             "http://localhost:8000".parse()?,
-            // TODO: Replace [YOUR_DROPLET_IP] with your Droplet IP address
             "http://localhost:3000".parse()?,
         ];  
 
@@ -50,7 +49,8 @@ impl Application {
         .route("/logout", post(logout))
         .route("/verify-2fa", post(verify_2fa))
         .route("/verify-token", post(verify_token))
-        .with_state(app_state);
+        .with_state(app_state)
+        .layer(cors);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();

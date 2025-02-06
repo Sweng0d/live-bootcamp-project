@@ -13,11 +13,13 @@ use auth_service::{
 
 #[tokio::main]
 async fn main() {
+    //salvar nome de usuarios e compartilhar na memória
     let store = HashmapUserStore::default();
 
     //compartilhar o UserStore em várias threads com segurança
     let user_store = Arc::new(RwLock::new(store)) as Arc<RwLock<dyn UserStore + Send + Sync>>;
 
+    //Parecido com user_store, mas é usado para guardar tokens banidos, prevenindo reuso de JWT, por exemplo.
     let banned_store: BannedTokenStoreType = Arc::new(RwLock::new(HashsetBannedTokenStore::new()));
 
     //Cria o `AppState` que guarda esse user_store

@@ -60,16 +60,17 @@ async fn protected(jar: CookieJar) -> impl IntoResponse {
         "token": &jwt_cookie.value(),
     });
 
-    let auth_hostname = env::var("AUTH_SERVICE_HOST_NAME").unwrap_or("0.0.0.0".to_owned());
-    let url = format!("http://{}:3000/verify-token", auth_hostname);
 
+    let auth_hostname = env::var("AUTH_SERVICE_HOST_NAME").unwrap_or("0.0.0.0".to_owned());
+    //change made with bodgan below:
+    let url = format!("http://localhost:3000/verify-token");
     let response = match api_client.post(&url).json(&verify_token_body).send().await {
         Ok(response) => response,
-        Err(_) => {
+        Err(e) => {
+            println!("{}", e);
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
-
     match response.status() {
         reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::BAD_REQUEST => {
             StatusCode::UNAUTHORIZED.into_response()
