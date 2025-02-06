@@ -42,7 +42,6 @@ async fn should_return_200_if_valid_jwt_cookie() {
     });
 
     let response = app.post_signup(&signup_body).await;
-
     assert_eq!(response.status().as_u16(), 201);
 
     let login_body = serde_json::json!({
@@ -51,7 +50,6 @@ async fn should_return_200_if_valid_jwt_cookie() {
     });
 
     let response = app.post_login(&login_body).await;
-
     assert_eq!(response.status().as_u16(), 200);
 
     // Verificar se cookie JWT está presente
@@ -65,18 +63,33 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .expect("Failed to convert header to string");
     // cookies_str algo como "jwt=valor; outro=algo"
 
-    let cookie_found = cookies_str
+    let full_cookie = cookies_str
         .split(';')
         .map(|s| s.trim())
-        .any(|cookie_pair| cookie_pair.starts_with(&format!("{}=", JWT_COOKIE_NAME)));
+        .find(|cookie_pair| cookie_pair.starts_with(&format!("{}=", JWT_COOKIE_NAME)))
+        .expect("JWT cookie should be present after login");
 
-    assert!(
-        cookie_found,
-        "JWT cookie should be present after login"
-    );
+    let token = full_cookie
+        .split('=')
+        .nth(1)
+        .expect("Should have a token value")
+        .to_string();
 
-    let logout_response = app.logout().await;
-    assert_eq!(logout_response.status().as_u16(), 200, "Should return 200 with valid JWT");
+        let logout_response = app.logout().await;
+        assert_eq!(
+            logout_response.status().as_u16(),
+            200,
+            "Should return 200 with valid JWT"
+        );
+
+        {
+            let store_guard = app.banned_token_store.read().await;
+            assert!(
+                store_guard.is_banned(&token),
+                "Expected token to be banned after logout"
+            );
+        }
+
 }
 
 #[tokio::test]

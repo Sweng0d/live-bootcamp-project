@@ -2,9 +2,15 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use auth_service::{
-    app_state::AppState, services::hashmap_user_store::HashmapUserStore, utils::constants::test,
+    app_state::{AppState, UserStoreType, BannedTokenStoreType},
+    services::{
+        hashmap_user_store::HashmapUserStore,
+        hashset_banned_token_store::HashsetBannedTokenStore, 
+    },
+    utils::constants::test,
     Application,
 };
+use auth_service::domain::data_stores::UserStore;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use reqwest::cookie::Jar;
@@ -13,12 +19,15 @@ pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
+    pub user_store: UserStoreType,
+    pub banned_token_store: BannedTokenStoreType,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
-        let app_state = AppState::new(user_store);
+        let banned_store: BannedTokenStoreType = Arc::new(RwLock::new(HashsetBannedTokenStore::new()));
+        let app_state = AppState::new(user_store.clone(), banned_store.clone());
 
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
@@ -42,6 +51,8 @@ impl TestApp {
             address,
             cookie_jar,
             http_client,
+            user_store,
+            banned_token_store: banned_store,
         }
 
     }
@@ -54,7 +65,6 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    // TODO: Implement helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
     pub async fn signup(&self, data: &SignupData) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/signup", &self.address))

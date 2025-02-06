@@ -1,14 +1,13 @@
 use axum::{
-    extract::{
-        Json,
-        rejection::JsonRejection
-    },
+    extract::{State, Json, rejection::JsonRejection},
     http::StatusCode,
-    response::{IntoResponse},
+    response::IntoResponse,
 };
 use serde::Deserialize;
 
+
 use crate::{
+    app_state::AppState,
     domain::AuthAPIError,
     utils::auth::validate_token,
 };
@@ -18,33 +17,28 @@ pub struct VerifyTokenRequest {
     pub token: String,
 }
 
-// Em vez de receber `Json<VerifyTokenRequest>` diretamente,
-// usamos `Result<Json<VerifyTokenRequest>, JsonRejection>`
-// e fazemos `match` para devolver 422 se der erro de parse.
-
+/// Recebe `maybe_payload` com `Result<Json<VerifyTokenRequest>, JsonRejection>`
+/// e `State<AppState>` para poder acessar o banned token store.
 pub async fn verify_token(
+    State(state): State<AppState>,
     maybe_payload: Result<Json<VerifyTokenRequest>, JsonRejection>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     match maybe_payload {
         Ok(Json(payload)) => {
-            // Se der certo o parse, validamos o token
-            validate_token(&payload.token)
+            // 1) Pegar lock de leitura do banned_token_store
+            let banned_guard = state.banned_token_store.read().await;
+
+            // 2) Chamar validate_token(token, &*banned_guard)
+            //    Se token for inválido ou banido, retornamos AuthAPIError::InvalidToken
+            validate_token(&payload.token, &*banned_guard)
                 .await
                 .map_err(|_| AuthAPIError::InvalidToken)?;
-            // Se tudo ok, retorna 200
+
+            // Se tudo der certo, retorna 200
             Ok(StatusCode::OK)
         }
+        // Se falhou parse (campo ausente, JSON inválido, etc), retornamos MalformedInput => 422
         Err(_rejection) => {
-            // Se falhou parse (campo ausente, JSON inválido, etc),
-            // retornamos ERR do tipo AuthAPIError. Mas se seu
-            // AuthAPIError não tiver "MalformedInput", você pode
-            // criar um e mapear p/ 422 no `impl IntoResponse`.
-
-            // Para simplificar, podemos "inventar" um erro ou
-            // mapeá-lo para 'InvalidCredentials' c/ status 422,
-            // mas o ideal é criar algo como `AuthAPIError::Unprocessable`.
-
-            // Exemplo rápido:
             Err(AuthAPIError::MalformedInput)
         }
     }
