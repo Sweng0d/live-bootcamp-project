@@ -110,3 +110,85 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
 
     assert!(!auth_cookie.value().is_empty());
 }
+
+#[tokio::test]
+async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
+    let app = TestApp::new().await;
+
+    let random_email = get_random_email();
+
+    let signup_body = serde_json::json!({
+        "email": random_email,
+        "password": "password123",
+        "requires2FA": true
+    });
+
+    let response = app.post_signup(&signup_body).await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let login_body = serde_json::json!({
+        "email": random_email,
+        "password": "password123",
+    });
+
+    let login_response = app.post_login(&login_body).await;
+
+    assert_eq!(
+        206,
+        login_response.status().as_u16(),
+        "Esperado 206 para credenciais válidas com 2FA habilitado."
+    );
+
+    let json_body: serde_json::Value = login_response
+        .json()
+        .await
+        .expect("Falha ao converter resposta para JSON.");
+
+    let message = json_body
+        .get("message")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    assert_eq!(
+        message,
+        "2FA required",
+        "Esperado '2FA required' no campo 'message'."
+    );
+
+    let login_attempt_id = json_body
+        .get("loginAttemptId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    assert!(
+        !login_attempt_id.is_empty(),
+        "Esperado campo 'loginAttemptId' não vazio."
+    );
+
+    // -- Verificação extra: o loginAttemptId está salvo no two_fa_code_store? --
+    // 1) Transforma `random_email` em `Email`
+    let user_email = auth_service::domain::email::Email::parse(&random_email)
+        .expect("Falha ao parsear random_email para Email");
+
+    // 2) Dá "read" no two_fa_code_store
+    let guard = app.two_fa_code_store.read().await;
+
+    // 3) Busca (LoginAttemptId, TwoFACode) do usuário
+    let (stored_attempt_id, stored_two_fa_code) = guard
+        .get_code(&user_email)
+        .await
+        .expect("Nenhum 2FA code encontrado no store para esse usuário!");
+
+    // 4) Compara
+    assert_eq!(
+        stored_attempt_id.as_ref(),
+        login_attempt_id,
+        "loginAttemptId armazenado não bate com o retornado pela rota"
+    );
+    assert!(
+        !stored_two_fa_code.as_ref().is_empty(),
+        "Código 2FA salvo não deveria estar vazio."
+    );
+
+
+
+}

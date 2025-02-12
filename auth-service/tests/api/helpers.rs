@@ -2,10 +2,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use auth_service::{
-    app_state::{AppState, UserStoreType, BannedTokenStoreType},
+    app_state::{AppState, BannedTokenStoreType, TwoFACodeStoreType, UserStoreType},
     services::{
-        hashmap_user_store::HashmapUserStore,
-        hashset_banned_token_store::HashsetBannedTokenStore, 
+        hashmap_two_fa_code_store::HashmapTwoFACodeStore, hashmap_user_store::HashmapUserStore,
+        hashset_banned_token_store::HashsetBannedTokenStore,
     },
     utils::constants::test,
     Application,
@@ -21,13 +21,16 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub user_store: UserStoreType,
     pub banned_token_store: BannedTokenStoreType,
+    pub two_fa_code_store: TwoFACodeStoreType,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_store: BannedTokenStoreType = Arc::new(RwLock::new(HashsetBannedTokenStore::new()));
-        let app_state = AppState::new(user_store.clone(), banned_store.clone());
+        let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+
+        let app_state = AppState::new(user_store.clone(), banned_store.clone(), two_fa_code_store.clone());
 
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
@@ -53,6 +56,7 @@ impl TestApp {
             http_client,
             user_store,
             banned_token_store: banned_store,
+            two_fa_code_store: two_fa_code_store.clone(),
         }
 
     }
