@@ -108,10 +108,17 @@ async fn handle_2fa(
     {
         let mut two_fa_store = state.two_fa_code_store.write().await;
         two_fa_store
-            .add_code(email.clone(), login_attempt_id.clone(), two_fa_code)
+            .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
             .await
             .map_err(|_| (jar.clone(), AuthAPIError::UnexpectedError))?;
     }
+
+    let subject = "Your 2FA Code";
+    let body = format!("Olá! Seu código de 2FA é: {}", two_fa_code.as_ref());
+    state.email_client
+        .send_email(email, subject, &body)
+        .await
+        .map_err(|_| (jar.clone(), AuthAPIError::UnexpectedError))?;
 
     // 3) Resposta 206 + JSON
     let response_body = LoginResponse::TwoFactorAuth {

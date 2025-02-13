@@ -14,6 +14,8 @@ use auth_service::domain::data_stores::UserStore;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use reqwest::cookie::Jar;
+use auth_service::services::mock_email_client::MockEmailClient;
+use auth_service::app_state::EmailClientType;
 
 pub struct TestApp {
     pub address: String,
@@ -29,8 +31,9 @@ impl TestApp {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_store: BannedTokenStoreType = Arc::new(RwLock::new(HashsetBannedTokenStore::new()));
         let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+        let email_client: EmailClientType = Arc::new(MockEmailClient);
 
-        let app_state = AppState::new(user_store.clone(), banned_store.clone(), two_fa_code_store.clone());
+        let app_state = AppState::new(user_store.clone(), banned_store.clone(), two_fa_code_store.clone(), email_client.clone());
 
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await

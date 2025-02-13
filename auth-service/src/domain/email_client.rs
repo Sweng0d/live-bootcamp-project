@@ -1,4 +1,5 @@
 use super::Email;
+use async_trait::async_trait;
 
 // This trait represents the interface all concrete email clients should implement
 #[async_trait::async_trait]

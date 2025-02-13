@@ -11,6 +11,8 @@ use auth_service::{
     utils::constants::prod,
     Application,
 };
+use auth_service::services::mock_email_client::MockEmailClient;
+use auth_service::app_state::EmailClientType;
 
 #[tokio::main]
 async fn main() {
@@ -25,8 +27,10 @@ async fn main() {
 
     let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
 
+    let email_client: EmailClientType = Arc::new(MockEmailClient);
+
     //Cria o `AppState` que guarda esse user_store
-    let app_state = AppState::new(user_store, banned_store, two_fa_code_store);
+    let app_state = AppState::new(user_store, banned_store, two_fa_code_store, email_client);
 
     //Aqui você monta a aplicação em si, passando o AppState e a porta de rede.
     let app = Application::build(app_state, prod::APP_ADDRESS)
